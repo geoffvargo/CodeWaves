@@ -1,0 +1,16 @@
+<resources>
+	<string name="app_name">CodeWaves</string>
+	<string name="message_view">Message View</string>
+	<string name="convo_view">Conversation View</string>
+	<string name="send_btn">Send</string>
+	<string name="permission_dialog_title">PERMISSIONS!</string>
+	<string name="permission_dialog_description">description</string>
+	<string name="permission_dialog_understand">understand</string>
+	<string name="refresh">Refresh</string>
+	<string name="connect">Connect</string>
+	<string name="disconnect">Disconnect</string>
+	<string name="pause">Pause</string>
+	<string name="reset">Reset Blink</string>
+	<string name="bottomBTNbar">bottomBTNbar</string>
+	<string name="topBTNbar">topBTNbar</string>
+</resources>
