@@ -87,24 +87,30 @@ public class MainActivity extends Activity implements View.OnClickListener {
 			Looper.loop();
 		}
 	};
+
 	private String currWord;
 	private ArrayList<String> message = new ArrayList<>();
 
 	//	private boolean
 	private ArrayList<BlinkStruct> currSymbol = new ArrayList<>();
+
 	private int bcount = 0;
+
 	private BlinkStruct blinkBuffer = new BlinkStruct();
+
 	/**
 	 * The MuseManager is how you detect Muse headbands and receive notifications
 	 * when the list of available headbands changes.
 	 */
 	private MuseManagerAndroid manager;
+
 	/**
 	 * A Muse refers to a Muse headband.  Use this to connect/disconnect from the
 	 * headband, register listeners to receive EEG data and get headband
 	 * configuration and version information.
 	 */
 	private Muse muse;
+
 	/**
 	 * The ConnectionListener will be notified whenever there is a change in
 	 * the connection state of a headband, for example when the headband connects
@@ -114,6 +120,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
 	 * that extends MuseConnectionListener.
 	 */
 	private ConnectionListener connectionListener;
+
 	/**
 	 * The DataListener is how you will receive EEG (and other) data from the
 	 * headband.
@@ -122,6 +129,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
 	 * that extends MuseDataListener.
 	 */
 	private DataListener dataListener;
+
 	private boolean eegStale;
 	private boolean alphaStale;
 	private boolean accelStale;
@@ -175,7 +183,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
 		Log.i(TAG, "LibMuse version=" + LibmuseVersion.instance().getString());
 
 		WeakReference<MainActivity> weakActivity =
-				new WeakReference<MainActivity>(this);
+			new WeakReference<MainActivity>(this);
 
 		// Register a listener to receive connection state changes.
 		connectionListener = new ConnectionListener(weakActivity);
@@ -230,24 +238,24 @@ public class MainActivity extends Activity implements View.OnClickListener {
 			// the user to grant us the permission.
 
 			DialogInterface.OnClickListener buttonListener =
-					new DialogInterface.OnClickListener() {
-						public void onClick(DialogInterface dialog, int which) {
-							dialog.dismiss();
-							ActivityCompat.requestPermissions(MainActivity.this,
-							                                  new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
-							                                  0);
-						}
-					};
+				new DialogInterface.OnClickListener() {
+					public void onClick(DialogInterface dialog, int which) {
+						dialog.dismiss();
+						ActivityCompat.requestPermissions(MainActivity.this,
+						                                  new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+						                                  0);
+					}
+				};
 
 			// This is the context dialog which explains to the user the reason we are requesting
 			// this permission.  When the user presses the positive (I Understand) button, the
 			// standard Android permission dialog will be displayed (as defined in the button
 			// listener above).
 			AlertDialog introDialog = new AlertDialog.Builder(this)
-					                          .setTitle(R.string.permission_dialog_title)
-					                          .setMessage(R.string.permission_dialog_description)
-					                          .setPositiveButton(R.string.permission_dialog_understand, buttonListener)
-					                          .create();
+				                          .setTitle(R.string.permission_dialog_title)
+				                          .setMessage(R.string.permission_dialog_description)
+				                          .setPositiveButton(R.string.permission_dialog_understand, buttonListener)
+				                          .create();
 			introDialog.show();
 		}
 	}
