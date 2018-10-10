@@ -60,11 +60,13 @@ public class MainActivity extends Activity implements View.OnClickListener {
 	 * To read the file back, you would use a MuseFileReader.
 	 */
 	private final AtomicReference<MuseFileWriter> fileWriter = new AtomicReference<>();
+
 	/**
 	 * We don't want file operations to slow down the UI, so we will defer those file operations
 	 * to a handler on a separate thread.
 	 */
 	private final AtomicReference<Handler> fileHandler = new AtomicReference<>();
+
 	/**
 	 * We don't want to block the UI thread while we write to a file, so the file
 	 * writing is moved to a separate thread.
@@ -351,7 +353,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
 			}
 		} else if (v.getId() == R.id.reset) {
 			TextView curr = (TextView) findViewById(R.id.convo_view);
-			curr.setText(new String(""));
+			curr.setText("");
 		}
 	}
 
