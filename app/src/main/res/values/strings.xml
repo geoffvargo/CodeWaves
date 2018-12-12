@@ -9,7 +9,7 @@
 	<string name="refresh">Refresh</string>
 	<string name="connect">Connect</string>
 	<string name="disconnect">Disconnect</string>
-	<string name="pause">Pause</string>
+	<string name="pause">Pause/Resume</string>
 	<string name="reset">Reset Blink</string>
 	<string name="bottomBTNbar">bottomBTNbar</string>
 	<string name="topBTNbar">topBTNbar</string>

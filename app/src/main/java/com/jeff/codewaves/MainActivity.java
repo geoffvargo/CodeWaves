@@ -4,10 +4,12 @@ package com.jeff.codewaves;
 
 import android.*;
 import android.app.*;
+import android.arch.lifecycle.*;
 import android.bluetooth.*;
 import android.content.*;
 import android.content.pm.*;
 import android.os.*;
+import android.support.constraint.solver.*;
 import android.support.v4.app.*;
 import android.support.v4.content.*;
 import android.util.*;
@@ -18,17 +20,89 @@ import com.choosemuse.libmuse.*;
 
 import java.io.*;
 import java.lang.ref.*;
+import java.security.*;
+import java.text.*;
 import java.util.*;
 import java.util.concurrent.atomic.*;
 
 public class MainActivity extends Activity implements View.OnClickListener {
 
 	/**
+	 * The type Blink struct.
+	 */
+	class BlinkStruct extends Object {
+		private boolean isBlink = false;
+		private long timestamp = 0L;
+
+		public BlinkStruct() {
+			this.isBlink = false;
+		}
+
+		public BlinkStruct(boolean isBlink, long timestamp) {
+			this.isBlink = isBlink;
+			this.timestamp = timestamp;
+		}
+	}
+
+	/* private enum */
+
+	/**
+	 * The type Muse l.
+	 */
+	class MuseL extends MuseListener {
+		final WeakReference<MainActivity> activityRef;
+
+		/**
+		 * Instantiates a new MuseL object.
+		 * @param activityRef
+		 * the activity ref
+		 */
+		MuseL(final WeakReference<MainActivity> activityRef) {
+			this.activityRef = activityRef;
+		}
+
+		@Override
+		public void museListChanged() {
+			activityRef.get().museListChanged();
+		}
+	}
+
+	class ConnectionListener extends MuseConnectionListener {
+		final WeakReference<MainActivity> activityRef;
+
+		ConnectionListener(final WeakReference<MainActivity> activityRef) {
+			this.activityRef = activityRef;
+		}
+
+		@Override
+		public void receiveMuseConnectionPacket(final MuseConnectionPacket p, final Muse muse) {
+			activityRef.get().receiveMuseConnectionPacket(p, muse);
+		}
+	}
+
+	class DataListener extends MuseDataListener {
+		final WeakReference<MainActivity> activityRef;
+
+		DataListener(final WeakReference<MainActivity> activityRef) {
+			this.activityRef = activityRef;
+		}
+
+		@Override
+		public void receiveMuseDataPacket(final MuseDataPacket p, final Muse muse) {
+			activityRef.get().receiveMuseDataPacket(p, muse);
+		}
+
+		@Override
+		public void receiveMuseArtifactPacket(final MuseArtifactPacket p, final Muse muse) {
+			activityRef.get().receiveMuseArtifactPacket(p, muse);
+		}
+	}
+
+	/**
 	 * Tag used for logging purposes.
 	 */
 	private final String TAG = "TestLibMuseAndroid";
 
-//	private enum
 	/**
 	 * Data comes in from the headband at a very fast rate; 220Hz, 256Hz or 500Hz,
 	 * depending on the type of headband and the preset configuration.  We buffer the
@@ -76,28 +150,27 @@ public class MainActivity extends Activity implements View.OnClickListener {
 		public void run() {
 			Looper.prepare();
 			fileHandler.set(new Handler());
-			final File dir  = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+			final File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
 			final File file = new File(dir, "new_muse_file.muse");
-			// MuseFileWriter will append to an existing file.
-			// In this case, we want to start fresh so the file
-			// if it exists.
+
+			/*  MuseFileWriter will append to an existing file.
+			 *  In this case, we want to start fresh so the file
+			 *  if it exists.   */
 			if (file.exists()) {
 				file.delete();
 			}
+
 			Log.i(TAG, "Writing data to: " + file.getAbsolutePath());
 			fileWriter.set(MuseFileFactory.getMuseFileWriter(file));
 			Looper.loop();
 		}
 	};
-
 	private String currWord;
 	private ArrayList<String> message = new ArrayList<>();
 
-	//	private boolean
+	/* private boolean */
 	private ArrayList<BlinkStruct> currSymbol = new ArrayList<>();
-
 	private int bcount = 0;
-
 	private BlinkStruct blinkBuffer = new BlinkStruct();
 
 	/**
@@ -131,10 +204,13 @@ public class MainActivity extends Activity implements View.OnClickListener {
 	 * that extends MuseDataListener.
 	 */
 	private DataListener dataListener;
-
 	private boolean eegStale;
+
+	/*--------------------------------------*/
+	/*	Lifecycle / Connection code */
 	private boolean alphaStale;
 	private boolean accelStale;
+
 	/**
 	 * The runnable that is used to update the UI at 60Hz.
 	 * <p>
@@ -159,26 +235,30 @@ public class MainActivity extends Activity implements View.OnClickListener {
 			handler.postDelayed(tickUi, 2000 / 60);
 		}
 	};
+
 	/**
 	 * In the UI, the list of Muses you can connect to is displayed in a Spinner object for this example.
 	 * This spinner adapter contains the MAC addresses of all of the headbands we have discovered.
 	 */
 	private ArrayAdapter<String> spinnerAdapter;
 
-	//--------------------------------------
-	// Lifecycle / Connection code
+	/*--------------------------------------*/
+	/*  Permissions */
+
 	/**
 	 * It is possible to pause the data transmission from the headband.  This boolean tracks whether
 	 * or not the data transmission is enabled as we allow the user to pause transmission in the UI.
 	 */
 	private boolean dataTransmission = true;
 
+	/*--------------------------------------*/
+	/*  Listeners   */
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 
-		// We need to set the context on MuseManagerAndroid before we can do anything.
-		// This must come before other LibMuse API calls as it also loads the library.
+		/*  We need to set the context on MuseManagerAndroid before we can do anything.
+		 *  This must come before other LibMuse API calls as it also loads the library. */
 		manager = MuseManagerAndroid.getInstance();
 		manager.setContext(this);
 
@@ -187,37 +267,37 @@ public class MainActivity extends Activity implements View.OnClickListener {
 		WeakReference<MainActivity> weakActivity =
 			new WeakReference<MainActivity>(this);
 
-		// Register a listener to receive connection state changes.
+		/*  Register a listener to receive connection state changes.  */
 		connectionListener = new ConnectionListener(weakActivity);
 
-		// Register a listener to receive data from a Muse.
+		/*  Register a listener to receive data from a Muse.    */
 		dataListener = new DataListener(weakActivity);
 
-		// Register a listener to receive notifications of what Muse headbands
-		// we can connect to.
+		/*  Register a listener to receive notifications of what Muse headbands
+		 *  we can connect to.  */
 		manager.setMuseListener(new MuseL(weakActivity));
 
-		// Muse 2016 (MU-02) headbands use Bluetooth Low Energy technology to
-		// simplify the connection process.  This requires access to the COARSE_LOCATION
-		// or FINE_LOCATION permissions.  Make sure we have these permissions before
-		// proceeding.
+		/*  Muse 2016 (MU-02) headbands use Bluetooth Low Energy technology to
+		 *  simplify the connection process.  This requires access to the COARSE_LOCATION
+		 *  or FINE_LOCATION permissions.  Make sure we have these permissions before
+		 *  proceeding. */
 		ensurePermissions();
 
-		// Load and initialize our UI.
+		/*  Load and initialize our UI. */
 		initUI();
 
-		// Start up a thread for asynchronous file operations.
-		// This is only needed if you want to do File I/O.
+		/*  Start up a thread for asynchronous file operations.
+		 *  This is only needed if you want to do File I/O. */
 		fileThread.start();
 
-		// Start our asynchronous updates of the UI.
+		/*  Start our asynchronous updates of the UI.   */
 		handler.post(tickUi);
 	}
 
 	protected void onPause() {
 		super.onPause();
-		// It is important to call stopListening when the Activity is paused
-		// to avoid a resource leak from the LibMuse library.
+		/*  It is important to call stopListening when the Activity is paused
+		 *  to avoid a resource leak from the LibMuse library.   */
 		manager.stopListening();
 	}
 
@@ -236,9 +316,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
 		if (ContextCompat.checkSelfPermission(this,
 		                                      Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-			// We don't have the ACCESS_COARSE_LOCATION permission so create the dialogs asking
-			// the user to grant us the permission.
 
+			/*  We don't have the ACCESS_COARSE_LOCATION permission so create the dialogs asking
+			 *  the user to grant us the permission.    */
 			DialogInterface.OnClickListener buttonListener =
 				new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int which) {
@@ -249,10 +329,10 @@ public class MainActivity extends Activity implements View.OnClickListener {
 					}
 				};
 
-			// This is the context dialog which explains to the user the reason we are requesting
-			// this permission.  When the user presses the positive (I Understand) button, the
-			// standard Android permission dialog will be displayed (as defined in the button
-			// listener above).
+			/* This is the context dialog which explains to the user the reason we are requesting
+			 * this permission.  When the user presses the positive (I Understand) button, the
+			 * standard Android permission dialog will be displayed (as defined in the button
+			 * listener above). */
 			AlertDialog introDialog = new AlertDialog.Builder(this)
 				                          .setTitle(R.string.permission_dialog_title)
 				                          .setMessage(R.string.permission_dialog_description)
@@ -261,9 +341,6 @@ public class MainActivity extends Activity implements View.OnClickListener {
 			introDialog.show();
 		}
 	}
-
-	//--------------------------------------
-	// Permissions
 
 	/**
 	 * Initializes the UI of the example application.
@@ -287,9 +364,6 @@ public class MainActivity extends Activity implements View.OnClickListener {
 		musesSpinner.setAdapter(spinnerAdapter);
 	}
 
-	//--------------------------------------
-	// Listeners
-
 	public boolean isBluetoothEnabled() {
 		return BluetoothAdapter.getDefaultAdapter().isEnabled();
 	}
@@ -298,55 +372,57 @@ public class MainActivity extends Activity implements View.OnClickListener {
 	public void onClick(View v) {
 
 		if (v.getId() == R.id.refresh) {
-			// The user has pressed the "Refresh" button.
-			// Start listening for nearby or paired Muse headbands. We call stopListening
-			// first to make sure startListening will clear the list of headbands and start fresh.
+
+			/*  The user has pressed the "Refresh" button.
+			 *  Start listening for nearby or paired Muse headbands. We call stopListening
+			 *  first to make sure startListening will clear the list of headbands and start fresh. */
 			manager.stopListening();
 			manager.startListening();
 
 		} else if (v.getId() == R.id.connect) {
 
-			// The user has pressed the "Connect" button to connect to
-			// the headband in the spinner.
+			/*  The user has pressed the "Connect" button to connect to
+			 *  the headband in the spinner.    */
 
-			// Listening is an expensive operation, so now that we know
-			// which headband the user wants to connect to we can stop
-			// listening for other headbands.
+			/* Listening is an expensive operation, so now that we know
+			 * which headband the user wants to connect to we can stop
+			 * listening for other headbands.   */
 			manager.stopListening();
 
 			List<Muse> availableMuses = manager.getMuses();
-			Spinner    musesSpinner   = (Spinner) findViewById(R.id.muses_spinner);
+			Spinner musesSpinner = (Spinner) findViewById(R.id.muses_spinner);
 
-			// Check that we actually have something to connect to.
+			/*  Check that we actually have something to connect to.    */
 			if (availableMuses.size() < 1 || musesSpinner.getAdapter().getCount() < 1) {
 				Log.w(TAG, "There is nothing to connect to");
 			} else {
 
-				// Cache the Muse that the user has selected.
+				/*  Cache the Muse that the user has selected.  */
 				muse = availableMuses.get(musesSpinner.getSelectedItemPosition());
-				// Unregister all prior listeners and register our data listener to
-				// receive the MuseDataPacketTypes we are interested in.  If you do
-				// not register a listener for a particular data type, you will not
-				// receive data packets of that type.
+
+				/*  Unregister all prior listeners and register our data listener to
+				 *  receive the MuseDataPacketTypes we are interested in.  If you do
+				 *  not register a listener for a particular data type, you will not
+				 *  receive data packets of that type.  */
 				registerListeners();
 
-				// Initiate a connection to the headband and stream the data asynchronously.
+				/*  Initiate a connection to the headband and stream the data asynchronously. */
 				muse.runAsynchronously();
 			}
 
 		} else if (v.getId() == R.id.disconnect) {
 
-			// The user has pressed the "Disconnect" button.
-			// Disconnect from the selected Muse.
+			/*  The user has pressed the "Disconnect" button.
+			 *	Disconnect from the selected Muse.  */
 			if (muse != null) {
 				muse.disconnect();
 			}
 
 		} else if (v.getId() == R.id.pause) {
 
-			// The user has pressed the "Pause/Resume" button to either pause or
-			// resume data transmission.  Toggle the state and pause or resume the
-			// transmission on the headband.
+			/*  The user has pressed the "Pause/Resume" button to either pause or
+			 *	resume data transmission.  Toggle the state and pause or resume the
+			 *	transmission on the headband.   */
 			if (muse != null) {
 				dataTransmission = !dataTransmission;
 				muse.enableDataTransmission(dataTransmission);
@@ -360,14 +436,17 @@ public class MainActivity extends Activity implements View.OnClickListener {
 	private void registerListeners() {
 		muse.unregisterAllListeners();
 		muse.registerConnectionListener(connectionListener);
-//				muse.registerDataListener(dataListener, MuseDataPacketType.EEG);
-//				muse.registerDataListener(dataListener, MuseDataPacketType.ALPHA_RELATIVE);
-//				muse.registerDataListener(dataListener, MuseDataPacketType.ACCELEROMETER);
-//				muse.registerDataListener(dataListener, MuseDataPacketType.BATTERY);
-//				muse.registerDataListener(dataListener, MuseDataPacketType.DRL_REF);
-//				muse.registerDataListener(dataListener, MuseDataPacketType.QUANTIZATION);
+		//				muse.registerDataListener(dataListener, MuseDataPacketType.EEG);
+		//				muse.registerDataListener(dataListener, MuseDataPacketType.ALPHA_RELATIVE);
+		//				muse.registerDataListener(dataListener, MuseDataPacketType.ACCELEROMETER);
+		//				muse.registerDataListener(dataListener, MuseDataPacketType.BATTERY);
+		//				muse.registerDataListener(dataListener, MuseDataPacketType.DRL_REF);
+		//				muse.registerDataListener(dataListener, MuseDataPacketType.QUANTIZATION);
 		muse.registerDataListener(dataListener, MuseDataPacketType.ARTIFACTS);
 	}
+
+	/*--------------------------------------*/
+	/*  UI Specific methods   */
 
 	/**
 	 * You will receive a callback to this method each time a headband is discovered.
@@ -384,49 +463,49 @@ public class MainActivity extends Activity implements View.OnClickListener {
 	/**
 	 * You will receive a callback to this method each time there is a change to the
 	 * connection state of one of the headbands.
-	 *
 	 * @param p
-	 * 		A packet containing the current and prior connection states
+	 * A packet containing the current and prior connection states
 	 * @param muse
-	 * 		The headband whose state changed.
+	 * The headband whose state changed.
 	 */
 	public void receiveMuseConnectionPacket(final MuseConnectionPacket p, final Muse muse) {
 
 		final ConnectionState current = p.getCurrentConnectionState();
 
-		// Format a message to show the change of connection state in the UI.
+		/*  Format a message to show the change of connection state in the UI.    */
 		final String status = p.getPreviousConnectionState() + " -> " + current;
 		Log.i(TAG, status);
 
-		// Update the UI with the change in connection state.
+		/*  Update the UI with the change in connection state.    */
 		handler.post(new Runnable() {
 			@Override
 			public void run() {
 
-//				final TextView statusText = (TextView) findViewById(R.id.con_status);
-//				statusText.setText(status);
+				//				final TextView statusText = (TextView) findViewById(R.id.con_status);
+				//				statusText.setText(status);
 
 				final MuseVersion museVersion = muse.getMuseVersion();
-//				final TextView    museVersionText = (TextView) findViewById(R.id.version);
-				// If we haven't yet connected to the headband, the version information
-				// will be null.  You have to connect to the headband before either the
-				// MuseVersion or MuseConfiguration information is known.
+				//				final TextView    museVersionText = (TextView) findViewById(R.id.version);
+				/*  If we haven't yet connected to the headband, the version information
+				 *	will be null.  You have to connect to the headband before either the
+				 *	MuseVersion or MuseConfiguration information is known.  */
 				if (museVersion != null) {
 					final String version = museVersion.getFirmwareType() + " - "
-					                       + museVersion.getFirmwareVersion() + " - "
-					                       + museVersion.getProtocolVersion();
-//					museVersionText.setText(version);
+						                       + museVersion.getFirmwareVersion() + " - "
+						                       + museVersion.getProtocolVersion();
+					//					museVersionText.setText(version);
 				} else {
-//					museVersionText.setText(R.string.undefined);
+					//					museVersionText.setText(R.string.undefined);
 				}
 			}
 		});
 
 		if (current == ConnectionState.DISCONNECTED) {
 			Log.i(TAG, "Muse disconnected:" + muse.getName());
-			// Save the data file once streaming has stopped.
+			/*  Save the data file once streaming has stopped.    */
 			saveFile();
-			// We have disconnected from the headband, so set our cached copy to null.
+
+			/*  We have disconnected from the headband, so set our cached copy to null.   */
 			this.muse = null;
 		}
 	}
@@ -441,10 +520,10 @@ public class MainActivity extends Activity implements View.OnClickListener {
 				@Override
 				public void run() {
 					MuseFileWriter w = fileWriter.get();
-					// Annotation strings can be added to the file to
-					// give context as to what is happening at that point in
-					// time.  An annotation can be an arbitrary string or
-					// may include additional AnnotationData.
+					/*  Annotation strings can be added to the file to
+					 *	give context as to what is happening at that point in
+					 *	time.  An annotation can be an arbitrary string or
+					 *	may include additional AnnotationData.  */
 					w.addAnnotationString(0, "Disconnected");
 					w.flush();
 					w.close();
@@ -457,16 +536,15 @@ public class MainActivity extends Activity implements View.OnClickListener {
 	 * You will receive a callback to this method each time the headband sends a MuseDataPacket
 	 * that you have registered.  You can use different listeners for different packet types or
 	 * a single listener for all packet types as we have done here.
-	 *
 	 * @param p
-	 * 		The data packet containing the data from the headband (eg. EEG data)
+	 * The data packet containing the data from the headband (eg. EEG data)
 	 * @param muse
-	 * 		The headband that sent the information.
+	 * The headband that sent the information.
 	 */
 	public void receiveMuseDataPacket(final MuseDataPacket p, final Muse muse) {
 		writeDataPacketToFile(p);
 
-		// valuesSize returns the number of data values contained in the packet.
+		/*  valuesSize returns the number of data values contained in the packet. */
 		final long n = p.valuesSize();
 		switch (p.packetType()) {
 			case EEG:
@@ -492,15 +570,11 @@ public class MainActivity extends Activity implements View.OnClickListener {
 		}
 	}
 
-	//--------------------------------------
-	// UI Specific methods
-
 	/**
 	 * Writes the provided MuseDataPacket to the file.  MuseFileWriter knows
 	 * how to write all packet types generated from LibMuse.
-	 *
 	 * @param p
-	 * 		The data packet to write.
+	 * The data packet to write.
 	 */
 	private void writeDataPacketToFile(final MuseDataPacket p) {
 		Handler h = fileHandler.get();
@@ -539,15 +613,17 @@ public class MainActivity extends Activity implements View.OnClickListener {
 		accelBuffer[2] = p.getAccelerometerValue(Accelerometer.Z);
 	}
 
+	/*--------------------------------------*/
+	/*	File I/O   */
+
 	/**
 	 * You will receive a callback to this method each time an artifact packet is generated if you
 	 * have registered for the ARTIFACTS data type.  MuseArtifactPackets are generated when
 	 * eye blinks are detected, the jaw is clenched and when the headband is put on or removed.
-	 *
 	 * @param p
-	 * 		The artifact packet with the data from the headband.
+	 * The artifact packet with the data from the headband.
 	 * @param muse
-	 * 		The headband that sent the information.
+	 * The headband that sent the information.
 	 */
 	public void receiveMuseArtifactPacket(final MuseArtifactPacket p, final Muse muse) {
 		getBlinkValue(blinkBuffer, p);
@@ -574,12 +650,12 @@ public class MainActivity extends Activity implements View.OnClickListener {
 	}
 
 	private void parseSymbol(ArrayList<BlinkStruct> cs) {
-		boolean  dot   = false;
-		boolean  dash  = false;
-		TextView curr  = (TextView) findViewById(R.id.convo_view);
-		long     diff1 = cs.get(1).timestamp - cs.get(0).timestamp;
-		long     diff2 = cs.get(2).timestamp - cs.get(1).timestamp;
-		long     diff3 = cs.get(3).timestamp - cs.get(2).timestamp;
+		boolean dot = false;
+		boolean dash = false;
+		TextView curr = (TextView) findViewById(R.id.convo_view);
+		long diff1 = cs.get(1).timestamp - cs.get(0).timestamp;
+		long diff2 = cs.get(2).timestamp - cs.get(1).timestamp;
+		long diff3 = cs.get(3).timestamp - cs.get(2).timestamp;
 		if (diff1 > 1000000 && diff1 < 2000000) {
 			dot = true;
 			if (diff2 < 500000 && diff3 < 500000) {
@@ -595,50 +671,52 @@ public class MainActivity extends Activity implements View.OnClickListener {
 	 * from the buffers.
 	 */
 	private void updateAccel() {
-//		TextView acc_x = (TextView) findViewById(R.id.acc_x);
-//		TextView acc_y = (TextView) findViewById(R.id.acc_y);
-//		TextView acc_z = (TextView) findViewById(R.id.acc_z);
-//		acc_x.setText(String.format("%6.2f", accelBuffer[0]));
-//		acc_y.setText(String.format("%6.2f", accelBuffer[1]));
-//		acc_z.setText(String.format("%6.2f", accelBuffer[2]));
+		//		TextView acc_x = (TextView) findViewById(R.id.acc_x);
+		//		TextView acc_y = (TextView) findViewById(R.id.acc_y);
+		//		TextView acc_z = (TextView) findViewById(R.id.acc_z);
+		//		acc_x.setText(String.format("%6.2f", accelBuffer[0]));
+		//		acc_y.setText(String.format("%6.2f", accelBuffer[1]));
+		//		acc_z.setText(String.format("%6.2f", accelBuffer[2]));
 	}
 
-	//--------------------------------------
-	// File I/O
+	/*--------------------------------------*/
+	/*	Listener translators
+	 *
+	 *  Each of these classes extend from the appropriate listener and contain a weak reference
+	 *  to the activity.  Each class simply forwards the messages it receives back to the Activity. */
 
 	private void updateEeg() {
-//		TextView tp9  = (TextView) findViewById(R.id.eeg_tp9);
-//		TextView fp1  = (TextView) findViewById(R.id.eeg_af7);
-//		TextView fp2  = (TextView) findViewById(R.id.eeg_af8);
-//		TextView tp10 = (TextView) findViewById(R.id.eeg_tp10);
-//		tp9.setText(String.format("%6.2f", eegBuffer[0]));
-//		fp1.setText(String.format("%6.2f", eegBuffer[1]));
-//		fp2.setText(String.format("%6.2f", eegBuffer[2]));
-//		tp10.setText(String.format("%6.2f", eegBuffer[3]));
+		//		TextView tp9  = (TextView) findViewById(R.id.eeg_tp9);
+		//		TextView fp1  = (TextView) findViewById(R.id.eeg_af7);
+		//		TextView fp2  = (TextView) findViewById(R.id.eeg_af8);
+		//		TextView tp10 = (TextView) findViewById(R.id.eeg_tp10);
+		//		tp9.setText(String.format("%6.2f", eegBuffer[0]));
+		//		fp1.setText(String.format("%6.2f", eegBuffer[1]));
+		//		fp2.setText(String.format("%6.2f", eegBuffer[2]));
+		//		tp10.setText(String.format("%6.2f", eegBuffer[3]));
 	}
 
 	private void updateAlpha() {
-//		TextView elem1 = (TextView) findViewById(R.id.elem1);
-//		elem1.setText(String.format("%6.2f", alphaBuffer[0]));
-//		TextView elem2 = (TextView) findViewById(R.id.elem2);
-//		elem2.setText(String.format("%6.2f", alphaBuffer[1]));
-//		TextView elem3 = (TextView) findViewById(R.id.elem3);
-//		elem3.setText(String.format("%6.2f", alphaBuffer[2]));
-//		TextView elem4 = (TextView) findViewById(R.id.elem4);
-//		elem4.setText(String.format("%6.2f", alphaBuffer[3]));
+		//		TextView elem1 = (TextView) findViewById(R.id.elem1);
+		//		elem1.setText(String.format("%6.2f", alphaBuffer[0]));
+		//		TextView elem2 = (TextView) findViewById(R.id.elem2);
+		//		elem2.setText(String.format("%6.2f", alphaBuffer[1]));
+		//		TextView elem3 = (TextView) findViewById(R.id.elem3);
+		//		elem3.setText(String.format("%6.2f", alphaBuffer[2]));
+		//		TextView elem4 = (TextView) findViewById(R.id.elem4);
+		//		elem4.setText(String.format("%6.2f", alphaBuffer[3]));
 	}
 
 	/**
 	 * Reads the provided .muse file and prints the data to the logcat.
-	 *
 	 * @param name
-	 * 		The name of the file to read.  The file in this example
-	 * 		is assumed to be in the Environment.DIRECTORY_DOWNLOADS
-	 * 		directory.
+	 * The name of the file to read.  The file in this example
+	 * is assumed to be in the Environment.DIRECTORY_DOWNLOADS
+	 * directory.
 	 */
 	private void playMuseFile(String name) {
 
-		File dir  = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+		File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
 		File file = new File(dir, name);
 
 		final String tag = "Muse File Reader";
@@ -650,23 +728,23 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
 		MuseFileReader fileReader = MuseFileFactory.getMuseFileReader(file);
 
-		// Loop through each message in the file.  gotoNextMessage will read the next message
-		// and return the result of the read operation as a Result.
+		/*  Loop through each message in the file.  gotoNextMessage will read the next message and return
+		 *	the result of the read operation as a Result.   */
 		Result res = fileReader.gotoNextMessage();
 		while (res.getLevel() == ResultLevel.R_INFO && !res.getInfo().contains("EOF")) {
 
-			MessageType type      = fileReader.getMessageType();
-			int         id        = fileReader.getMessageId();
-			long        timestamp = fileReader.getMessageTimestamp();
+			MessageType type = fileReader.getMessageType();
+			int id = fileReader.getMessageId();
+			long timestamp = fileReader.getMessageTimestamp();
 
 			Log.i(tag, "type: " + type.toString() +
-			           " id: " + Integer.toString(id) +
-			           " timestamp: " + String.valueOf(timestamp));
+				           " id: " + Integer.toString(id) +
+				           " timestamp: " + String.valueOf(timestamp));
 
 			switch (type) {
-				// EEG messages contain raw EEG data or DRL/REF data.
-				// EEG derived packets like ALPHA_RELATIVE and artifact packets
-				// are stored as MUSE_ELEMENTS messages.
+				/*  EEG messages contain raw EEG data or DRL/REF data.
+				 *  EEG derived packets like ALPHA_RELATIVE and artifact packets
+				 *  are stored as MUSE_ELEMENTS messages.   */
 				case EEG:
 				case BATTERY:
 				case ACCELEROMETER:
@@ -692,71 +770,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
 					break;
 			}
 
-			// Read the next message.
+			/*	Read the next message. */
 			res = fileReader.gotoNextMessage();
-		}
-	}
-
-	class BlinkStruct extends Object {
-		private boolean isBlink = false;
-		private long timestamp = 0L;
-
-		public BlinkStruct() {
-			this.isBlink = false;
-		}
-
-		public BlinkStruct(boolean isBlink, long timestamp) {
-			this.isBlink = isBlink;
-			this.timestamp = timestamp;
-		}
-	}
-
-	//--------------------------------------
-	// Listener translators
-	//
-	// Each of these classes extend from the appropriate listener and contain a weak reference
-	// to the activity.  Each class simply forwards the messages it receives back to the Activity.
-	class MuseL extends MuseListener {
-		final WeakReference<MainActivity> activityRef;
-
-		MuseL(final WeakReference<MainActivity> activityRef) {
-			this.activityRef = activityRef;
-		}
-
-		@Override
-		public void museListChanged() {
-			activityRef.get().museListChanged();
-		}
-	}
-
-	class ConnectionListener extends MuseConnectionListener {
-		final WeakReference<MainActivity> activityRef;
-
-		ConnectionListener(final WeakReference<MainActivity> activityRef) {
-			this.activityRef = activityRef;
-		}
-
-		@Override
-		public void receiveMuseConnectionPacket(final MuseConnectionPacket p, final Muse muse) {
-			activityRef.get().receiveMuseConnectionPacket(p, muse);
-		}
-	}
-
-	class DataListener extends MuseDataListener {
-		final WeakReference<MainActivity> activityRef;
-
-		DataListener(final WeakReference<MainActivity> activityRef) {
-			this.activityRef = activityRef;
-		}
-
-		@Override
-		public void receiveMuseDataPacket(final MuseDataPacket p, final Muse muse) {
-			activityRef.get().receiveMuseDataPacket(p, muse);
-		}
-
-		@Override
-		public void receiveMuseArtifactPacket(final MuseArtifactPacket p, final Muse muse) {
-			activityRef.get().receiveMuseArtifactPacket(p, muse);
 		}
 	}
 }
